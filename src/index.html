@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MPU6050 Micro Eletro Mechanical Sensor</title>
+</head>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.4/Chart.js"></script>
+
+<span style="color: blue;">
+    <h1>GIRO</h1>
+    <p><span id='GiroX'>00</span></p>
+</span>
+<body>
+ <canvas id="myChart" style="width:100%;max-width:700px"></canvas>
+    <script>
+        var Socket;
+        
+        function init() {
+            Socket = new WebSocket('ws://192.168.0.64:5555/ws');
+            Socket.onmessage = function (event) {
+                processCommand(event);
+            };    
+        }
+        setInterval( function processCommand(event)  {
+            document.getElementById('GiroX').innerHTML = event.data;
+            console.log(event.data);            
+        }, 1000 );
+        
+        window.onload = function (event) {
+            init();
+        }
+    </script>
+    
+
+</body>
+</html>
+
+

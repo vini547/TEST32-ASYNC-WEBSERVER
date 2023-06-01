@@ -10,6 +10,12 @@
 #include <FS.h>
 #include <time.h>
 #include <esp_log.h>
+#include "soc/rtc_wdt.h"
+#include <AsyncTCP.h>
+#include <Arduino.h>
+#include <AsyncWebSocket.h>
+#include <Ticker.h>
+
  
 const char* ssid = "MORDOR";
 const char* password =  "fernandahplg";
@@ -19,7 +25,7 @@ float gForceX, gForceY, gForceZ;
 long gyroX, gyroY, gyroZ;
 float rotX, rotY, rotZ;
 
-
+int n = 0;
 const char* ntpServer = "pool.ntp.org";
 const long gmtOffset_sec = -10800;
 const int daylightOffset_sec = 3600;
@@ -27,44 +33,103 @@ const int daylightOffset_sec = 3600;
 DynamicJsonDocument doc(1024);
 char buffer[1024];
 uint32_t timenow = 0;
+
+Ticker messageSender;
+bool sendMessageFlag = false;
+	
+const char html[] = "<!DOCTYPE html>\n"
+"<html lang=\"en\">\n"
+"<head>\n"
+"    <meta charset=\"UTF-8\">\n"
+"    <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">\n"
+"    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n"
+"    <title>MPU6050 Micro Eletro Mechanical Sensor</title>\n"
+"</head>\n"
+"<script src=\"https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.4/Chart.js\"></script>\n"
+"\n"
+"<span style=\"color: blue;\">\n"
+"    <h1>Giro</h1>\n"
+"    <p><span id='GiroX'>'%STATE%'</span></p>\n"
+"  <!--   <p><span id='GiroY'>0</span></p>\n"
+"    <p><span id='GiroZ'>00</span></p>\n"
+"    <h1>Accel</h1>\n"
+"    <p><span id='AccelX'>0</span></p>\n"
+"    <p><span id='AccelY'>0</span></p>\n"
+"    <p><span id='AccelZ'>0</span></p> -->\n"
+"\n"
+"\n"
+"\n"
+"</span>\n"
+"<body>\n"
+" <canvas id=\"myChart\" style=\"width:100%;max-width:700px\"></canvas>\n"
+"    <script>\n"
+"        var Socket;\n"
+"        function init() {\n"
+"            Socket = new WebSocket('ws://192.168.0.64:5555/ws');\n"
+"            Socket.onmessage = function (event) {\n"
+"                processCommand(event);\n"
+"            };    \n"
+"        }\n"
+"        function processCommand(event)  {\n"
+"            document.getElementById('GiroX').innerHTML = event.data;\n"
+"            console.log(event.data);            \n"
+"        }\n"
+"        window.onload = function (event) {\n"
+"            init();\n"
+"        }\n"
+"    </script>\n"
+"    <script>\n"
+"        var xyValues = [\n"
+"          {x:50, y:7},\n"
+"          {x:60, y:8},\n"
+"          {x:70, y:8},\n"
+"          {x:80, y:9},\n"
+"          {x:90, y:9},\n"
+"          {x:100, y:9},\n"
+"          {x:110, y:10},\n"
+"          {x:120, y:11},\n"
+"          {x:130, y:14},\n"
+"          {x:140, y:14},\n"
+"          {x:150, y:15}\n"
+"        ];\n"
+"        \n"
+"        new Chart(\"myChart\", {\n"
+"          type: \"scatter\",\n"
+"          data: {\n"
+"            datasets: [{\n"
+"              pointRadius: 4,\n"
+"              pointBackgroundColor: \"rgb(0,0,255)\",\n"
+"              data: xyValues\n"
+"            }]\n"
+"          },\n"
+"          options: {\n"
+"            legend: {display: false},\n"
+"            scales: {\n"
+"              xAxes: [{ticks: {min: 40, max:160}}],\n"
+"              yAxes: [{ticks: {min: 6, max:16}}],\n"
+"            }\n"
+"          }\n"
+"        });\n"
+"        </script>\n"
+"\n"
+"</body>\n"
+"</html>";
  
-AsyncWebServer server(5555);
+AsyncWebServer server(5555); /* object of class AsyncWebServer needed to configure the HTTP asynchronous webserver. */
 AsyncWebSocket ws("/ws");
  
-void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventType type, void * arg, uint8_t *data, size_t len){
- 
+void onWsEvent(AsyncWebSocket * server, 
+               AsyncWebSocketClient * client, 
+               AwsEventType type, 
+               void * arg, 
+               uint8_t *data, 
+               size_t len) {
+  
   if(type == WS_EVT_CONNECT){
- 
-    Serial.println("Websocket client connection received");
-    digitalWrite(led,HIGH);
-    delay(250);
-    digitalWrite(led,LOW);
-    delay(250);
-    digitalWrite(led,HIGH);
-    delay(250);
-    digitalWrite(led,LOW);
-    delay(250);
-    digitalWrite(led,HIGH);
-    delay(250);
-    digitalWrite(led,LOW);
-    delay(250);  
-    client->text("Hello from ESP32 Server");
-    digitalWrite(led,HIGH);
-    delay(500);
-    digitalWrite(led,LOW);
-    delay(500);
-    digitalWrite(led,HIGH);
-    delay(500);
-    digitalWrite(led,LOW);
-    delay(500);
-    digitalWrite(led,HIGH);
-    delay(500);
-    digitalWrite(led,LOW);
-    delay(500);  
- 
+    Serial.println("Client Connected"); 
+      
   } else if(type == WS_EVT_DISCONNECT){
-    Serial.println("Client disconnected");
- 
+    Serial.println("Client disconnected"); 
   }
 }
 
@@ -182,8 +247,22 @@ void initWiFi() {
   Serial.println(WiFi.macAddress());
 }
 
+String processor(const String& var)
+{
 
- 
+  Serial.println(var+" will be "+ buffer);
+
+  if(var == "STATE"){
+    return String(buffer);
+  }
+
+  return String();
+}
+
+void sendMessages() {
+  sendMessageFlag = true;
+}
+
 void setup(){
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
   Serial.begin(115200);
@@ -194,24 +273,13 @@ void setup(){
   setupMPU();
    
  
-  ws.onEvent(onWsEvent);
-  server.addHandler(&ws);
+  
 
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send(200, "text/plain", "Hello World");
-    Serial.println("HTTP_GET request received from client");
-    digitalWrite(led,HIGH);
-    delay(500);
-    digitalWrite(led,LOW);
-    delay(500);
-    digitalWrite(led,HIGH);
-    delay(500);
-    digitalWrite(led,LOW);
-    delay(500);
-    digitalWrite(led,HIGH);
-    delay(500);
-    digitalWrite(led,LOW);
-    delay(500); 
+    request->send_P(200, "text/html", html, processor );
+    
+    
+    
   });
 
     server.on("/serve_txt", HTTP_GET, [](AsyncWebServerRequest *request){
@@ -234,12 +302,35 @@ void setup(){
     digitalWrite(led,LOW);
     delay(500); 
   });
- 
+
+
+
+  ws.onEvent(onWsEvent);
+  server.addHandler(&ws);
   server.begin();
+  messageSender.attach(12.0, sendMessages);
+  
+  
 }
  
 void loop(){
-
+ ws.cleanupClients(); 
+ recordAccelRegisters();
+ recordGyroRegisters();
+ serializeJsonDocument();
  
+ if (sendMessageFlag) {
+    // Generate or retrieve the message you want to send
+    String message = buffer;
+
+    // Send the message to all connected clients
+    ws.textAll(message);
+
+    // Reset the flag
+    sendMessageFlag = true;
+  }
+ 
+ 
+ delay(500);
 
 }
