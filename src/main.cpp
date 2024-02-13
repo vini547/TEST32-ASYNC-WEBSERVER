@@ -17,8 +17,8 @@
 #include <Ticker.h>
 
  
-const char* ssid = "MORDOR";
-const char* password =  "fernandahplg";
+const char* ssid = "243";
+const char* password =  "2344";
 const int led = 2;
 long accelX, accelY, accelZ;
 float gForceX, gForceY, gForceZ;
