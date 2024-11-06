@@ -1,3 +1,5 @@
+#ESP32 Async Web Server
+
 Este código é uma aplicação IoT desenvolvida para o microcontrolador ESP32, projetada para capturar dados de movimento (aceleração e rotação) usando o sensor MPU6050. Esses dados são transmitidos em tempo real para uma interface web através de um WebSocket e, simultaneamente, armazenados localmente no sistema de arquivos SPIFFS. Cada um desses componentes desempenha um papel crucial dentro do contexto de sistemas embarcados e IoT, onde eficiência, conectividade e armazenamento local são essenciais para monitoramento e análise de dados.
 
 O formato JSON é usado para estruturar e transportar os dados de forma leve e compatível com múltiplas plataformas. Com o ArduinoJson, os dados brutos capturados do MPU6050 são convertidos para JSON, facilitando a interpretação e transmissão dos dados, tanto no servidor como no cliente web. A escolha pelo JSON é importante em sistemas embarcados devido à simplicidade e universalidade do formato, que pode ser lido facilmente por linguagens diferentes e analisado em dashboards ou bancos de dados.
